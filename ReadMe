@@ -86,6 +86,7 @@ pred_rf <- predict(mod_rf, training_cv)
 confusionMatrix(pred_rf,training_cv$classe)
 
 #Results showed accuracy is 99.17%. As the accuracy is high, no further tuning to the model is needed. (You may tune further but take-note of overfitting issue)
+#Out of sample error is 0.0083.
 
 Confusion Matrix and Statistics
 
