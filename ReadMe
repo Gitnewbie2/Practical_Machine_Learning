@@ -1,0 +1,128 @@
+###Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+###Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+### Objective
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+### Load library and training and testing datasets
+
+library(caret)
+
+#Load training dataset
+trainfile <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+training <- read.csv(trainfile, header=TRUE)
+training$classe <- as.factor(training$classe)
+
+#Load testing dataset
+testfile <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+testing <- read.csv(testfile, header=TRUE)
+
+###See variable list to drop unnecessary variables which do not help in prediction
+names(training)
+names(testing)
+
+#For example
+ amplitude_pitch_forearm amplitude_yaw_forearm total_accel_forearm var_accel_forearm avg_roll_forearm
+1                      NA                                        36                NA               NA
+2                      NA                                        36                NA               NA
+3                      NA                                        36                NA               NA
+4                      NA                                        36                NA               NA
+5                      NA                                        36                NA               NA
+6                      NA                                        36                NA               NA
+
+
+#Drop first 7 variables since not useful in prediction
+training <- training[,8:length(colnames(training))]
+testing <- testing[,8:length(colnames(testing))]
+
+#For example
+  X user_name raw_timestamp_part_1 raw_timestamp_part_2   cvtd_timestamp new_window num_window
+1 1  carlitos           1323084231               788290 05/12/2011 11:23         no         11     
+2 2  carlitos           1323084231               808298 05/12/2011 11:23         no         11   
+3 3  carlitos           1323084231               820366 05/12/2011 11:23         no         11    
+4 4  carlitos           1323084232               120339 05/12/2011 11:23         no         12  
+5 5  carlitos           1323084232               196328 05/12/2011 11:23         no         12     
+6 6  carlitos           1323084232               304277 05/12/2011 11:23         no         12       
+
+# Drop colums with NAs
+training <- training[, colSums(is.na(training)) == 0] 
+testing <- testing[, colSums(is.na(testing)) == 0] 
+
+# Drop variables with zero variance predictors
+nzv <- nearZeroVar(training,saveMetrics=TRUE)
+zero.var.ind <- sum(nzv$nzv)
+if ((zero.var.ind>0)) {
+    training <- training[,nzv$nzv==FALSE]
+}
+
+###Create Cross Validation dataset
+
+#Split the training dataset into 70-30 to create the cross-validation dataset. Rmb not to split from the testing dataset. Train on the 70% dataset and cross-validate with the 30% dataset.
+
+inTrain <- createDataPartition(training$classe, p=0.70, list=F)
+training_final <- training[inTrain, ]
+training_cv <- training[-inTrain, ]
+
+###Train model using Random forest
+#Add tuning for model by adding 5-fold cross-validation. Default number of trees is 500.
+mod_rf <- train(classe ~., data=training_final, method="rf", trControl=trainControl(method="cv", number=5))
+
+##Apply trained model on cross-validation dataset and check accuracy of model
+pred_rf <- predict(mod_rf, training_cv)
+confusionMatrix(pred_rf,training_cv$classe)
+
+#Results showed accuracy is 99.17%. As the accuracy is high, no further tuning to the model is needed. (You may tune further but take-note of overfitting issue)
+
+Confusion Matrix and Statistics
+
+          Reference
+Prediction    A    B    C    D    E
+         A 1673   10    0    0    0
+         B    0 1126   12    0    1
+         C    1    3 1006   13    1
+         D    0    0    8  951    0
+         E    0    0    0    0 1080
+
+Overall Statistics
+                                         
+               Accuracy : 0.9917         
+                 95% CI : (0.989, 0.9938)
+    No Information Rate : 0.2845         
+    P-Value [Acc > NIR] : < 2.2e-16      
+                                         
+                  Kappa : 0.9895         
+ Mcnemar's Test P-Value : NA             
+
+
+Statistics by Class:
+
+                     Class: A Class: B Class: C Class: D Class: E
+Sensitivity            0.9994   0.9886   0.9805   0.9865   0.9982
+Specificity            0.9976   0.9973   0.9963   0.9984   1.0000
+Pos Pred Value         0.9941   0.9886   0.9824   0.9917   1.0000
+Neg Pred Value         0.9998   0.9973   0.9959   0.9974   0.9996
+Prevalence             0.2845   0.1935   0.1743   0.1638   0.1839
+Detection Rate         0.2843   0.1913   0.1709   0.1616   0.1835
+Detection Prevalence   0.2860   0.1935   0.1740   0.1630   0.1835
+Balanced Accuracy      0.9985   0.9929   0.9884   0.9924   0.9991
+
+###Apply model to predict on test dataset
+results <- predict(mod_rf, testing[, -length(names(testing))])
+results
+
+ [1] B A B A A E D B A A B C B A E E A B B B
+Levels: A B C D E
